@@ -7,6 +7,10 @@ import java.util.Comparator;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.io.*;
+//ScheduledExecutorService를 위한 라이브러리 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class MainFrame extends JFrame {
 
@@ -18,7 +22,8 @@ public class MainFrame extends JFrame {
     private JLabel goalAchievementLabel; // 학습 목표 달성률을 표시할 레이블
     private JPanel infoPanel; // 과제 정보와 학습 목표 달성률을 표시할 패널
     private JPanel assignmentInfoPanel; // 과제 정보 패널을 클래스 멤버로 선언
-
+    private ScheduledExecutorService scheduler;
+    
     public MainFrame() {
     	isDarkMode = SettingsManager.loadDarkModeState(); // 다크 모드 상태 로드
         setLookAndFeel(isDarkMode);
@@ -35,9 +40,35 @@ public class MainFrame extends JFrame {
         setupDarkModeToggle();
 
         setVisible(true);
-        startAlertTimer(); // 알림 타이머 시작
-    }
+     // 스케줄러 초기화
+        scheduler = Executors.newScheduledThreadPool(1);
 
+        startAlertTask(); // 알림 작업 시작
+    }
+    
+    // 다른 메뉴에서 메인프레임으로 돌아올 때 사용할 생성
+    public MainFrame(boolean isDarkMode) {
+    	this.isDarkMode = isDarkMode; // 전달받은 다크 모드 상태 저장
+        setLookAndFeel(isDarkMode);
+        setTitle("스마트 학습 도우미");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(600, 400);
+        setLayout(new BorderLayout()); // BorderLayout 설정 (패널 위치 지정 가능)
+
+        timeTablePanel = new TimeTablePanel(); // 시간표 관리
+        setupInfoPanel(); // 정보 패널 설정
+        setupButtonPanel(); // 버튼 패널 설정
+        
+     // 다크 모드 스위치 추가
+        setupDarkModeToggle();
+
+        setVisible(true);
+     // 스케줄러 초기화
+        scheduler = Executors.newScheduledThreadPool(1);
+
+        startAlertTask(); // 알림 작업 시작
+    }
+    
     private void setupInfoPanel() {
         infoPanel = new JPanel();
         infoPanel.setLayout(new GridBagLayout());
@@ -139,7 +170,7 @@ public class MainFrame extends JFrame {
         JFrame timetableFrame = new JFrame("수업 관리");
         timetableFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         timetableFrame.setSize(600, 400);
-        timetableFrame.add(timeTablePanel);
+        timetableFrame.add(new TimeTablePanel());
         timetableFrame.setVisible(true);
     }
 
@@ -151,23 +182,27 @@ public class MainFrame extends JFrame {
     
     
     // 수업 10분 전 알림 실행
-    private void startAlertTimer() {
-        alertTimer = new Timer();
-        alertTimer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                ArrayList<ClassSchedule> schedules = timeTablePanel.getSchedules();
-                String currentTime = getCurrentTime();
-                String currentDay = getCurrentDay();
+    private void startAlertTask() {
+        scheduler.scheduleAtFixedRate(() -> {
+            ArrayList<ClassSchedule> schedules = timeTablePanel.getSchedules();
+            String currentTime = getCurrentTime();
+            String currentDay = getCurrentDay();
 
-                for (ClassSchedule schedule : schedules) {
-                    String alertTime = calculateAlertTime(schedule.getStartTime());
-                    if (currentTime.equals(alertTime) && currentDay.equals(schedule.getDayOfWeek())) {
-                        showAlert(schedule);
-                    }
+            for (ClassSchedule schedule : schedules) {
+                String alertTime = calculateAlertTime(schedule.getStartTime());
+                if (currentTime.equals(alertTime) && currentDay.equals(schedule.getDayOfWeek())) {
+                    SwingUtilities.invokeLater(() -> showAlert(schedule)); // UI 작업은 SwingUtilities 사용
                 }
             }
-        }, 0, 60 * 1000); // 1분마다 실행
+        }, 0, 1, TimeUnit.MINUTES); // 1분마다 실행
+    }
+    
+    @Override
+    public void dispose() {
+        super.dispose();
+        if (scheduler != null) {
+            scheduler.shutdown(); // 스케줄러 종료
+        }
     }
     
     // 현재 시간 구하는 메소드

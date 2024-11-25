@@ -512,8 +512,11 @@ public class StudyManagementPanel extends JPanel {
     }
 
     private void goBackToMain() {
-        JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
+    	JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
         topFrame.dispose(); // 현재 창 닫기
-        new MainFrame(); // MainFrame 열기
+
+        // 다크 모드 상태 전달
+        boolean isDarkMode = SettingsManager.loadDarkModeState();
+        new MainFrame(isDarkMode); // 메인 프레임 열기
     }
 }
