@@ -309,7 +309,7 @@ public class TimeTablePanel extends JPanel {
         showPanel("AddPanel");
     }
     
-    // assignment에서 과목몽을 시간표에서 가져오기 위한 함수
+    // assignment에서 과목명을 시간표에서 가져오기 위한 함수
     public ArrayList<String> getSubjectList() {
         ArrayList<String> subjects = new ArrayList<>();
         for (ClassSchedule schedule : schedules) { // schedules는 TimeTablePanel의 수업 리스트

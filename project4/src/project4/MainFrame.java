@@ -3,15 +3,18 @@ package project4;
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class MainFrame extends JFrame {
 
     private TimeTablePanel timeTablePanel;
-    private Timer alertTimer;
+    private Timer alertTimer; // 수업 10분 전 알림을 할 타이머
     private JLabel assignmentInfoLabel; // 과제 정보를 표시할 레이블
-    private JPanel assignmentInfoPanel;
+    private JLabel goalAchievementLabel; // 학습 목표 달성률을 표시할 레이블
+    private JPanel infoPanel; // 과제 정보와 학습 목표 달성률을 표시할 패널
+    private JPanel assignmentInfoPanel; // 과제 정보 패널을 클래스 멤버로 선언
 
     public MainFrame() {
         setTitle("스마트 학습 도우미");
@@ -20,7 +23,52 @@ public class MainFrame extends JFrame {
         setLayout(new BorderLayout()); // BorderLayout 설정 (패널 위치 지정 가능)
 
         timeTablePanel = new TimeTablePanel(); // 시간표 관리
+        setupInfoPanel(); // 정보 패널 설정
+        setupButtonPanel(); // 버튼 패널 설정
 
+        setVisible(true);
+        startAlertTimer(); // 알림 타이머 시작
+    }
+
+    private void setupInfoPanel() {
+        infoPanel = new JPanel();
+        infoPanel.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(10, 10, 10, 10); // 마진 설정
+
+        assignmentInfoLabel = new JLabel();
+        goalAchievementLabel = new JLabel();
+
+        assignmentInfoLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
+        goalAchievementLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 14));
+
+        updateAssignmentInfo(); // 과제 정보 초기화
+        updateGoalAchievementInfo(); // 학습 목표 달성률 업데이트
+
+        JSeparator separator = new JSeparator(); // 구분선 추가
+        separator.setForeground(Color.DARK_GRAY);
+
+        // 레이블 추가
+        infoPanel.add(assignmentInfoLabel, gbc);
+        infoPanel.add(separator, gbc); // 구분선 위치 조정
+        infoPanel.add(goalAchievementLabel, gbc);
+
+        // 공백 추가: 추가적인 공간을 만들기 위해 vertical strut을 사용
+        Component verticalStrut = Box.createVerticalStrut(20); // 20픽셀의 수직 공백
+        gbc = new GridBagConstraints(); // 새 GridBagConstraints 객체 초기화
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weighty = 1.0; 
+        infoPanel.add(verticalStrut, gbc);  // 공백 패널에 추가
+
+        add(infoPanel, BorderLayout.NORTH);
+    }
+
+
+
+    private void setupButtonPanel() {
         JPanel buttonPanel = new JPanel();
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
 
@@ -34,46 +82,15 @@ public class MainFrame extends JFrame {
         buttonPanel.add(timetableButton);
         buttonPanel.add(exitButton);
 
-        homeworkButton.addActionListener(e -> {
-            setVisible(false);
-            ArrayList<String> subjects = timeTablePanel.getSubjectList();
-            JFrame assignmentFrame = new JFrame("과제 관리");
-            assignmentFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-            assignmentFrame.setSize(600, 400);
-            assignmentFrame.add(new AssignmentPanel(subjects));
-            assignmentFrame.setVisible(true);
-        });
+        homeworkButton.addActionListener(e -> showAssignmentManagement());
+        studyButton.addActionListener(e -> showStudyManagement());
+        timetableButton.addActionListener(e -> showTimeTableManagement());
+        exitButton.addActionListener(e -> exitApplication()); // 람다식 대신 메서드 참조 수정
 
-        studyButton.addActionListener(e -> {
-            setVisible(false);
-            JFrame studyManagementFrame = new JFrame("학습 관리");
-            studyManagementFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-            studyManagementFrame.setSize(600, 400);
-            studyManagementFrame.add(new StudyManagementPanel());
-            studyManagementFrame.setVisible(true);
-        });
-
-        timetableButton.addActionListener(e -> {
-            setVisible(false);
-            JFrame timetableFrame = new JFrame("수업 관리");
-            timetableFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-            timetableFrame.setSize(600, 400);
-            timetableFrame.add(timeTablePanel);
-            timetableFrame.setVisible(true);
-        });
-
-        exitButton.addActionListener(e -> {
-            if (alertTimer != null) alertTimer.cancel(); // 타이머 종료
-            System.exit(0);
-        });
-
-        // 버튼 패널과 과제 정보 패널 추가
         add(buttonPanel, BorderLayout.CENTER);
-        updateAssignmentInfo(); // 과제 정보 초기화
-
-        setVisible(true);
-        startAlertTimer(); // 알림 타이머 시작
     }
+
+
 
     private JButton createButton(String text) {
         JButton button = new JButton(text);
@@ -82,59 +99,50 @@ public class MainFrame extends JFrame {
         return button;
     }
 
-    // 과제 정보를 업데이트
-    private void updateAssignmentInfo() {
-        // AssignmentPanel에서 데이터 가져오기
-        AssignmentPanel assignmentPanel = new AssignmentPanel(timeTablePanel.getSubjectList());
-        int totalAssignments = assignmentPanel.getTotalAssignments();
-        Assignment nearestAssignment = assignmentPanel.getNearestAssignment(); // 가장 가까운 과제 객체 반환
 
-        // 기존 패널 초기화
-        if (assignmentInfoPanel != null) {
-            remove(assignmentInfoPanel); // 이전 패널 제거
-        }
+    private void updateGoalAchievementInfo() {
+        StudyManagementPanel studyPanel = new StudyManagementPanel();
+        String goalAchievementText = studyPanel.calculateAchievementDisplay();
+        goalAchievementLabel.setText(goalAchievementText);
+        goalAchievementLabel.setFont(new Font("맑은 고딕", Font.BOLD, 14));
+    }
 
-        // 새로운 패널 구성
-        assignmentInfoPanel = new JPanel();
-        assignmentInfoPanel.setLayout(new BoxLayout(assignmentInfoPanel, BoxLayout.Y_AXIS));
-        assignmentInfoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // 여백 추가
+    private void showAssignmentManagement() {
+        dispose(); // 현재 메인 프레임 닫기
+        ArrayList<String> subjects = timeTablePanel.getSubjectList();
+        JFrame assignmentFrame = new JFrame("과제 관리");
+        assignmentFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        assignmentFrame.setSize(600, 400);
+        assignmentFrame.add(new AssignmentPanel(subjects));
+        assignmentFrame.setVisible(true);
+    }
 
-        JLabel totalLabel = new JLabel(String.format("전체 과제 개수: %d", totalAssignments));
-        totalLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
-        totalLabel.setForeground(Color.BLUE);
-        totalLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    private void showStudyManagement() {
+        dispose(); // 현재 메인 프레임 닫기
+        JFrame studyManagementFrame = new JFrame("학습 관리");
+        studyManagementFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        studyManagementFrame.setSize(600, 400);
+        studyManagementFrame.add(new StudyManagementPanel());
+        studyManagementFrame.setVisible(true);
+    }
 
-        JLabel nearestLabel = new JLabel();
-        nearestLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 14));
-        nearestLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        if (nearestAssignment != null) {
-            // 과제명과 마감일을 표시
-            nearestLabel.setText(String.format(
-                "<html><div style='text-align: center;'>"
-                + "<b>%s</b> 과제가 <b>%s</b>까지입니다!"
-                + "</div></html>",
-                nearestAssignment.getAssignmentName(),
-                nearestAssignment.getDueDate()
-            ));
-        } else {
-            nearestLabel.setText("남은 과제가 없습니다.");
-        }
-
-        // 패널에 추가
-        assignmentInfoPanel.add(totalLabel);
-        assignmentInfoPanel.add(Box.createRigidArea(new Dimension(0, 10))); // 간격 추가
-        assignmentInfoPanel.add(nearestLabel);
-
-        // 메인 프레임에 패널 추가
-        add(assignmentInfoPanel, BorderLayout.NORTH); // 상단에 추가
-        revalidate(); // 레이아웃 갱신
-        repaint(); // 화면 다시 그리기
+    private void showTimeTableManagement() {
+        dispose(); // 현재 메인 프레임 닫기
+        JFrame timetableFrame = new JFrame("수업 관리");
+        timetableFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        timetableFrame.setSize(600, 400);
+        timetableFrame.add(timeTablePanel);
+        timetableFrame.setVisible(true);
     }
 
 
-
-    // 수업 시작 10분 전 알림 타이머
+    private void exitApplication() {
+        if (alertTimer != null) alertTimer.cancel();
+        System.exit(0);
+    }
+    
+    
+    // 수업 10분 전 알림 실행
     private void startAlertTimer() {
         alertTimer = new Timer();
         alertTimer.scheduleAtFixedRate(new TimerTask() {
@@ -153,34 +161,13 @@ public class MainFrame extends JFrame {
             }
         }, 0, 60 * 1000); // 1분마다 실행
     }
-
+    
+    // 현재 시간 구하는 메소드
     private String getCurrentTime() {
         return java.time.LocalTime.now().toString().substring(0, 5); // HH:mm 형식
     }
 
-    private String calculateAlertTime(String startTime) {
-        int hour = Integer.parseInt(startTime.split(":")[0]);
-        int minute = Integer.parseInt(startTime.split(":")[1]) - 10;
-        if (minute < 0) {
-            hour -= 1;
-            minute += 60;
-        }
-        return String.format("%02d:%02d", hour, minute);
-    }
-
-    private void showAlert(ClassSchedule schedule) {
-        SwingUtilities.invokeLater(() -> {
-            JOptionPane.showMessageDialog(
-                    this,
-                    "수업 시작 10분 전입니다!\n" +
-                    "과목명: " + schedule.getSubjectName() + "\n" +
-                    "시간: " + schedule.getStartTime(),
-                    "알림",
-                    JOptionPane.INFORMATION_MESSAGE
-            );
-        });
-    }
-    
+    // 해당 요일의 수업에 대해 10분 전 알림을 하기 위해 현재 요일 구하는 메소드
     private String getCurrentDay() {
         java.time.DayOfWeek dayOfWeek = java.time.LocalDate.now().getDayOfWeek();
         switch (dayOfWeek) {
@@ -194,6 +181,84 @@ public class MainFrame extends JFrame {
             default: return "";
         }
     }
-
     
+    // 수업 10분 전 알림 시간 구하는 메소드
+    private String calculateAlertTime(String startTime) {
+        int hour = Integer.parseInt(startTime.split(":")[0]);
+        int minute = Integer.parseInt(startTime.split(":")[1]) - 10;
+        if (minute < 0) {
+            hour -= 1;
+            minute += 60;
+        }
+        return String.format("%02d:%02d", hour, minute);
+    }
+    
+    
+    // 수업 10분 전 알림 창 띄우는 메소드
+    private void showAlert(ClassSchedule schedule) {
+        SwingUtilities.invokeLater(() -> {
+            JOptionPane.showMessageDialog(this,
+                "수업 시작 10분 전입니다!\n" +
+                "과목명: " + schedule.getSubjectName() + "\n" +
+                "시간: " + schedule.getStartTime(),
+                "알림",
+                JOptionPane.INFORMATION_MESSAGE);
+        });
+    }
+    
+    // 메인프레임 상단 과제 정보 출력하는 메소드
+    private void updateAssignmentInfo() {
+        AssignmentPanel assignmentPanel = new AssignmentPanel(timeTablePanel.getSubjectList()); // 이 부분은 필요에 따라 조정
+        int totalAssignments = assignmentPanel.getTotalAssignments(); // 과제 총 개수 가져오기
+        Assignment nearestAssignment = assignmentPanel.getNearestAssignment(); // 가장 마감기한이 임박한 과제 가져오기
+
+        // 이전 정보가 있는 경우 UI에서 제거
+        if (assignmentInfoPanel != null) {
+            assignmentInfoPanel.removeAll();
+        } else {
+            assignmentInfoPanel = new JPanel();
+            assignmentInfoPanel.setLayout(new BoxLayout(assignmentInfoPanel, BoxLayout.Y_AXIS));
+            assignmentInfoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        }
+
+        JLabel totalLabel = new JLabel(String.format("전체 과제 개수: %d", totalAssignments));
+        totalLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
+        totalLabel.setForeground(Color.BLUE);
+        totalLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel nearestLabel = new JLabel();
+        nearestLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 14));
+        nearestLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        if (nearestAssignment != null) {
+            nearestLabel.setText(String.format("<html><div style='text-align: center;'>"
+                                               + "<b>%s</b> 과제가 <b>%s</b>까지입니다!</div></html>",
+                                               nearestAssignment.getAssignmentName(),
+                                               nearestAssignment.getDueDate()));
+        } else {
+            nearestLabel.setText("남은 과제가 없습니다.");
+        }
+
+        assignmentInfoPanel.add(totalLabel);
+        assignmentInfoPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        assignmentInfoPanel.add(nearestLabel);
+
+        infoPanel.add(assignmentInfoPanel);
+        revalidate();
+        repaint();
+    }
+    // 메인프레임에 과제 개수 표시하기 위해 받아오는 메소드
+    private ArrayList<Assignment> getAssignments() {
+        return new ArrayList<>();
+    }
+    
+    // 마감기한이 가장 임박한 과제 메인프레임에 표시하기 위한 메소드
+    private Assignment getNearestAssignment(ArrayList<Assignment> assignments) {
+        return assignments.stream()
+                          .min(Comparator.comparing(Assignment::getDueDate))
+                          .orElse(null);
+    }
+    
+    
+
 }
