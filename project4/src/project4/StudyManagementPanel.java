@@ -1,5 +1,13 @@
 package project4;
 
+
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.CategoryPlot;
+import org.jfree.chart.renderer.category.BarRenderer;
+import org.jfree.data.category.DefaultCategoryDataset;
+
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
@@ -12,7 +20,7 @@ public class StudyManagementPanel extends JPanel {
     private final String FILE_NAME = "study_records.txt";
 
     public StudyManagementPanel() {
-        cardLayout = new CardLayout();
+    	cardLayout = new CardLayout();
         setLayout(cardLayout);
 
         JPanel mainPanel = new JPanel();
@@ -43,6 +51,7 @@ public class StudyManagementPanel extends JPanel {
 
         cardLayout.show(this, "MainMenu");
     }
+
 
 
     private JButton createButton(String text) {
@@ -279,8 +288,71 @@ public class StudyManagementPanel extends JPanel {
     
     private JButton createGoalAchievementButton() {
         JButton button = createButton("학습 목표 달성 확인");
-        button.addActionListener(e -> showPanel("GoalAchievementPanel"));
+        button.addActionListener(e -> showAchievementChart());
         return button;
+    }
+    
+    private void showAchievementChart() {
+        StudyGoal goals = loadGoals();
+        Map<String, Duration> studyTimes = calculateStudyTimesUntilToday();
+
+        Duration dailyAchieved = studyTimes.getOrDefault(LocalDate.now().toString(), Duration.ZERO);
+        Duration weeklyAchieved = calculateTotalWeekly(studyTimes);
+        Duration monthlyAchieved = calculateTotalMonthly(studyTimes);
+
+        // Create dataset for the chart
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        dataset.addValue(dailyAchieved.toMinutes(), "달성", "일별 목표");
+        dataset.addValue(goals.getDailyGoal().toMinutes(), "목표", "일별 목표");
+
+        dataset.addValue(weeklyAchieved.toMinutes(), "달성", "주별 목표");
+        dataset.addValue(goals.getWeeklyGoal().toMinutes(), "목표", "주별 목표");
+
+        dataset.addValue(monthlyAchieved.toMinutes(), "달성", "월별 목표");
+        dataset.addValue(goals.getMonthlyGoal().toMinutes(), "목표", "월별 목표");
+
+        // Create the chart
+        JFreeChart barChart = ChartFactory.createBarChart(
+                "학습 목표 달성률", // Title
+                "기간", // X-Axis Label
+                "시간(분)", // Y-Axis Label
+                dataset // Dataset
+        );
+        
+     // 커스터마이징을 위한 Renderer 가져오기
+        CategoryPlot plot = barChart.getCategoryPlot();
+        BarRenderer renderer = (BarRenderer) plot.getRenderer();
+
+        // 막대 색상 설정
+        renderer.setSeriesPaint(0, new Color(72, 201, 176));  // "달성" 막대 색상
+        renderer.setSeriesPaint(1, new Color(169, 169, 169)); // "목표" 막대 색상
+
+        // Create a panel to hold the chart and the button
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+
+        ChartPanel chartPanel = new ChartPanel(barChart);
+        panel.add(chartPanel, BorderLayout.CENTER);
+
+        // Add back button
+        JButton backButton = new JButton("뒤로가기");
+        backButton.addActionListener(e -> {
+            // Close the chart window on button click
+            SwingUtilities.getWindowAncestor(panel).dispose();
+        });
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.add(backButton);
+
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        // Display the panel in a new JFrame
+        JFrame chartFrame = new JFrame("학습 목표 달성률");
+        chartFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        chartFrame.setSize(800, 600);
+        chartFrame.add(panel);
+        chartFrame.setVisible(true);
     }
 
     private JPanel createGoalAchievementPanel() {
