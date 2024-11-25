@@ -254,9 +254,13 @@ public class AssignmentPanel extends JPanel {
         cardLayout.show(this, name);
     }
 
+ // 서브 프레임에서 메인 프레임 열기
     private void goBackToMain() {
         JFrame topFrame = (JFrame) SwingUtilities.getWindowAncestor(this);
-        topFrame.dispose();
-        new MainFrame();
+        topFrame.dispose(); // 현재 창 닫기
+
+        // 다크 모드 상태 전달
+        boolean isDarkMode = SettingsManager.loadDarkModeState();
+        new MainFrame(isDarkMode); // 메인 프레임 열기
     }
 }
