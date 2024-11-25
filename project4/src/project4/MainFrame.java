@@ -6,8 +6,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.io.*;
 
 public class MainFrame extends JFrame {
+
+    private boolean isDarkMode = false; // 다크 모드 상태
 
     private TimeTablePanel timeTablePanel;
     private Timer alertTimer; // 수업 10분 전 알림을 할 타이머
@@ -17,6 +20,8 @@ public class MainFrame extends JFrame {
     private JPanel assignmentInfoPanel; // 과제 정보 패널을 클래스 멤버로 선언
 
     public MainFrame() {
+    	isDarkMode = SettingsManager.loadDarkModeState(); // 다크 모드 상태 로드
+        setLookAndFeel(isDarkMode);
         setTitle("스마트 학습 도우미");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(600, 400);
@@ -25,6 +30,9 @@ public class MainFrame extends JFrame {
         timeTablePanel = new TimeTablePanel(); // 시간표 관리
         setupInfoPanel(); // 정보 패널 설정
         setupButtonPanel(); // 버튼 패널 설정
+        
+     // 다크 모드 스위치 추가
+        setupDarkModeToggle();
 
         setVisible(true);
         startAlertTimer(); // 알림 타이머 시작
@@ -221,9 +229,9 @@ public class MainFrame extends JFrame {
             assignmentInfoPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         }
 
-        JLabel totalLabel = new JLabel(String.format("전체 과제 개수: %d", totalAssignments));
+        JLabel totalLabel = new JLabel(String.format("          %d개의 과제가 있습니다", totalAssignments));
         totalLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
-        totalLabel.setForeground(Color.BLUE);
+        totalLabel.setForeground(Color.RED);
         totalLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         JLabel nearestLabel = new JLabel();
@@ -247,18 +255,42 @@ public class MainFrame extends JFrame {
         revalidate();
         repaint();
     }
-    // 메인프레임에 과제 개수 표시하기 위해 받아오는 메소드
-    private ArrayList<Assignment> getAssignments() {
-        return new ArrayList<>();
-    }
     
-    // 마감기한이 가장 임박한 과제 메인프레임에 표시하기 위한 메소드
-    private Assignment getNearestAssignment(ArrayList<Assignment> assignments) {
-        return assignments.stream()
-                          .min(Comparator.comparing(Assignment::getDueDate))
-                          .orElse(null);
-    }
     
+    
+ // 다크모드 관
+    private void setupDarkModeToggle() {
+        JPanel togglePanel = new JPanel();
+        togglePanel.setLayout(new FlowLayout(FlowLayout.CENTER)); // 가운데 정렬
+
+        JButton toggleModeButton = new JButton("모드 전환");
+        toggleModeButton.addActionListener(e -> {
+            isDarkMode = !isDarkMode;
+            setLookAndFeel(isDarkMode);
+
+            // 상태 저장
+            SettingsManager.saveDarkModeState(isDarkMode);
+        });
+
+        togglePanel.add(toggleModeButton);
+
+        // SOUTH 대신 CENTER에 추가
+        add(togglePanel, BorderLayout.SOUTH);
+    }
+
+    
+    private void setLookAndFeel(boolean isDarkMode) {
+        try {
+            if (isDarkMode) {
+                UIManager.setLookAndFeel("com.formdev.flatlaf.FlatDarkLaf");
+            } else {
+                UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
+            }
+            SwingUtilities.updateComponentTreeUI(this);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     
 
 }
